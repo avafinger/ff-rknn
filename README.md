@@ -42,7 +42,7 @@ Install SDL3, FFmpeg (with mp4,mkv,rtsp,rtmp,http support), librga, libyuv, libr
 
     - `MP4 / MKV video streams` - Play h264 video stream
 
-		    ./ff-rknn -i ../../videos_rknn/vid-3.mp4 -x 1920 -y 1080 -l 0 -t 0 -m ./model/RK3588/yolov5s-640-640.rknn
+		    ./ff-rknn -i ../../videos_rknn/vid-3.mp4 -x 960 -y 540 -l 0 -t 0 -m ./model/RK3588/yolov5s-640-640.rknn
 
     - `RTSP` - Play *rtsp* live stream from camera
 
