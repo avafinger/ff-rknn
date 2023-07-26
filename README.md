@@ -65,6 +65,8 @@ Install SDL3, FFmpeg (with mp4,mkv,rtsp,rtmp,http support), librga, libyuv, libr
 
   - -x displayed width
   - -y displayed height
+  - -l displayed left position (X11)
+  - -t displayed top position (X11)
   - -m rknn model
   - -f protocol (v4l2, rtsp, rtmp, http)
   - -p pixel format (h264) - camera
