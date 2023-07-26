@@ -758,7 +758,7 @@ int main(int argc, char *argv[])
             sdl_linked.major, sdl_linked.minor, sdl_linked.patch);
 
     // SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
-    SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_ALLOW_LIBDECOR, "0");
+    // SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_ALLOW_LIBDECOR, "0");
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         SDL_Log("SDL_Init failed (%s)", SDL_GetError());
         avformat_close_input(&input_ctx);
