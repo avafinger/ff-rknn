@@ -61,6 +61,17 @@ Install SDL3, FFmpeg (with mp4,mkv,rtsp,rtmp,http support), librga, libyuv, libr
 		    ./ff-rknn -f v4l2 -p h264 -s 1920x1080 -i /dev/video23 -m ./model/RK3588/yolov5s-640-640.rknn -x 960 -y 540
 
 
+- **parameters**
+
+  - -x displayed width
+  - -y displayed height
+  - -m rknn model
+  - -f protocol (v4l2, rtsp, rtmp, http)
+  - -p pixel format (h264) - camera
+  - -s video frame size (WxH) - camera
+  - -r video frame rate - camera
+
+
 ## References
 
 * SDL3 - https://github.com/libsdl-org/SDL	
