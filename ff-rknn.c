@@ -530,9 +530,6 @@ int main(int argc, char *argv[])
         }
         i++;
     }
-    // fprintf(stderr,"%s: %u\n", "-p", hash_me("-p"));
-    // fprintf(stderr,"%s: %u\n", "-s", hash_me("-s"));
-
     if (!video_name) {
         fprintf(stderr, "No stream to play! Please pass an input.\n");
         print_help();
@@ -712,8 +709,7 @@ int main(int argc, char *argv[])
         avformat_close_input(&input_ctx);
         return -1;
     }
-    fprintf(stderr, "1 - dict\n");
-
+    
     video = input_ctx->streams[video_stream];
     if (avcodec_parameters_to_context(codec_ctx, video->codecpar) < 0) {
         av_log(0, AV_LOG_ERROR, "Error with the codec!\n");
