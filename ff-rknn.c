@@ -791,10 +791,10 @@ int main(int argc, char *argv[])
     }
 
     frameSize_rknn = width * height * channel;
-    resize_buf = calloc(1, frameSize_rknn + 8 * 1024);
+    resize_buf = calloc(1, frameSize_rknn);
 
     frameSize_texture = screen_width * screen_height * channel;
-    texture_dst_buf = calloc(1, frameSize_texture + 8 * 1024);
+    texture_dst_buf = calloc(1, frameSize_texture);
 
     if (!resize_buf || !texture_dst_buf) {
         av_log(NULL, AV_LOG_FATAL, "Failed to create texture buf: %dx%d",
