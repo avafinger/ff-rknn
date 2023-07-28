@@ -1,7 +1,7 @@
 ## Introduction
 
-**ff-rknn** is a small application optimized to decode H264 stream with rkmpp hardware decoding, access Rockchip NPU hardware accelerator and render the result using SDL3 texture with mali hardware acceleration.<br>
-This document describes how to build and run ff-rknn on Rockchip devices with NPU. It can decode h264, rtsp, rtmp and http streams.
+**ff-rknn** is a small application optimized to decode H264 / H265 stream with rkmpp hardware decoding, access Rockchip NPU hardware accelerator and render the result using SDL3 texture with mali hardware acceleration.<br>
+This document describes how to build and run ff-rknn on Rockchip devices with NPU. It can decode h264/hevc, rtsp, rtmp and http streams.
 
 
 ### System requirements
@@ -17,9 +17,9 @@ This document describes how to build and run ff-rknn on Rockchip devices with NP
 
 ### Limitations
 
-The code make use of FFmpeg (LGPL), SDL3 (zlib) and Rockhip rknn (Apache 2) model type converted from Yolov5s model. The code is provided in source code form to comply with license requirements.<br>
+The code makes use of FFmpeg (LGPL), SDL3 (zlib), and Rockhip rknn (Apache 2) model type converted from Yolov5s model. The code is provided in source code form to comply with license requirements.<br>
 Binary code is not provided and you must compile it yourself. It is highly dependent on these libraries and Desktop Hardware acceleration. <br>A version with OpenCV may be provided to extend AI capabilities but OpenCV is slow.<br>
-ff-rknn can decode and render H264 stream only.
+ff-rknn can decode and render H264 / H265 stream only.
 
 
 ## Install necessary libraries
@@ -60,6 +60,9 @@ Install SDL3, FFmpeg (with mp4,mkv,rtsp,rtmp,http support), librga, libyuv, libr
 
 		    ./ff-rknn -f v4l2 -p h264 -s 1920x1080 -i /dev/video23 -m ./model/RK3588/yolov5s-640-640.rknn -x 960 -y 540
 
+    - `ALPHA BLEND` - Play *h264* / *H265* video stream and draw alpha blend rectangle on detected objects
+
+		     DISPLAY=:0.0 ./ff-rknn -i /apps/videos_rknn/vid-2.mp4 -x 960 -y 540 -l 0 -t 0 -m ./model/RK3588/yolov5s-640-640.rknn -b 80 -o motorcycle -a 60
 
 - **parameters**
 
@@ -72,7 +75,9 @@ Install SDL3, FFmpeg (with mp4,mkv,rtsp,rtmp,http support), librga, libyuv, libr
   - -p pixel format (h264) - camera
   - -s video frame size (WxH) - camera
   - -r video frame rate - camera
-
+  - -o unique object to detect
+  - -b use alpha blend on detected objects (1 ~ 255)
+  - -a accuracy perc (1 ~ 100)\n");
 
 ## References
 
