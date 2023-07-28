@@ -1,6 +1,6 @@
 /*
- * ff-rknn - Decode H264, ai inference, render it on screen
- * Alexander Finger <alex.mobigo@gmail.com>
+ * ff-rknn - Decode H264 / HEVC, AI Inference, Render it on screen
+ * 2023 Alexander Finger <alex.mobigo@gmail.com>
  *
  * This code has been tested on Rockchip RK3588 platform
  *      kernel v5.10.110 BSP
@@ -87,17 +87,22 @@ extern "C" {
 #define MODEL_WIDTH  640
 #define MODEL_HEIGHT 640
 
+#define arg_a 36430 // -a
+#define arg_b 36431 // -b
 #define arg_i 36438 // -i
 #define arg_x 36453 // -x
 #define arg_y 36454 // -y
 #define arg_l 36441 // -l
 #define arg_m 36442 // -m
+#define arg_o 36444 // -o
 #define arg_t 36449 // -t
 #define arg_f 36435 // -f
 #define arg_r 36447 // -r
 #define arg_d 36433 // -d
 #define arg_p 36445 // -p
 #define arg_s 36448 // -s
+
+static unsigned int hash_me(char *str);
 
 /* --- RKNN --- */
 int channel = 3;
@@ -113,12 +118,15 @@ std::vector<float> out_scales;
 std::vector<int32_t> out_zps;
 rknn_context ctx;
 rknn_input_output_num io_num;
-rknn_input inputs[1];
-rknn_tensor_attr output_attrs[128];
+rknn_input inputs[2];
+rknn_tensor_attr output_attrs[256];
 size_t actual_size = 0;
 const float nms_threshold = NMS_THRESH;
 const float box_conf_threshold = BOX_THRESH;
 /* --- SDL --- */
+int alphablend;
+int accur;
+unsigned int obj2det;
 int frameSize_texture;
 int frameSize_rknn;
 void *resize_buf;
@@ -162,15 +170,15 @@ enum AVPixelFormat get_format(AVCodecContext *Context,
     return AV_PIX_FMT_NONE;
 }
 
-static int drm_rga_buf(int src_Width, int src_Height, int src_fd,
+static int drm_rga_buf(int src_Width, int src_Height, int wStride, int hStride, int src_fd,
                        int src_format, int dst_Width, int dst_Height,
                        int dst_format, int frameSize, char *buf)
 {
     rga_info_t src;
     rga_info_t dst;
     int ret;
-    int hStride = (src_Height + 15) & (~15);
-    int wStride = (src_Width + 15) & (~15);
+    // int hStride = (src_Height + 15) & (~15);
+    // int wStride = (src_Width + 15) & (~15);
     // int dhStride = (dst_Height + 15) & (~15);
     // int dwStride = (dst_Width + 15) & (~15);
 
@@ -193,7 +201,7 @@ static int drm_rga_buf(int src_Width, int src_Height, int src_fd,
 }
 
 #if 0
-static char *drm_get_rgaformat_str(uint32_t drm_fmt)
+static char *drm_get_rgaformat_str(uint32_t drm_fmt) 
 {
   switch (drm_fmt) {
   case DRM_FORMAT_NV12:
@@ -255,39 +263,88 @@ static void displayTexture(void *imageData)
     // Draw Objects
     char text[256];
     SDL_FRect rect;
+    unsigned int obj;
+    int accur_obj;
+    int clr;
     for (int i = 0; i < detect_result_group.count; i++) {
         detect_result_t *det_result = &(detect_result_group.results[i]);
 #if 0
     sprintf(text, "%s %.1f%%", det_result->name, det_result->prop * 100);
     printf("%s @ (%d %d %d %d) %f\n",
-           det_result->name,
-           det_result->box.left,
+           det_result->name, 
+           det_result->box.left, 
            det_result->box.top,
-           det_result->box.right,
-           det_result->box.bottom,
+           det_result->box.right, 
+           det_result->box.bottom, 
            det_result->prop);
 #endif
-        if (det_result->name[0] == 'p' && det_result->name[1] == 'e')
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'c' && det_result->name[1] == 'a')
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'b' && det_result->name[1] == 'u')
-            SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'b' && det_result->name[1] == 'i')
-            SDL_SetRenderDrawColor(renderer, 255, 255, 0, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'm' && det_result->name[1] == 'o')
-            SDL_SetRenderDrawColor(renderer, 128, 155, 255, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'b' && det_result->name[3] == 'k')
-            SDL_SetRenderDrawColor(renderer, 128, 128, 128, SDL_ALPHA_OPAQUE);
-        else if (det_result->name[0] == 'u' && det_result->name[1] == 'm')
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-        else
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
-
+        if (obj2det) {
+            obj = hash_me(det_result->name);
+            if (obj != obj2det) {
+                continue;
+            }
+        }
+        if (accur) {
+            accur_obj = (int)(det_result->prop * 100.0);
+            if (accur_obj < accur) {
+                continue;
+            }
+        }
         rect.x = det_result->box.left;
         rect.y = det_result->box.top;
         rect.w = det_result->box.right - det_result->box.left;
         rect.h = det_result->box.bottom - det_result->box.top;
+        if (det_result->name[0] == 'p' && det_result->name[1] == 'e')
+            clr = 1;
+        else if (det_result->name[0] == 'c' && det_result->name[1] == 'a')
+            clr = 2;
+        else if (det_result->name[0] == 'b' && det_result->name[1] == 'u')
+            clr = 3;
+        else if (det_result->name[0] == 'b' && det_result->name[1] == 'i')
+            clr = 4;
+        else if (det_result->name[0] == 'm' && det_result->name[1] == 'o')
+            clr = 5;
+        else if (det_result->name[0] == 'b' && det_result->name[3] == 'k')
+            clr = 6;
+        else if (det_result->name[0] == 'u' && det_result->name[1] == 'm')
+            clr = 7;
+        else
+            clr = 0;
+        if (alphablend) {
+            if (clr == 1)
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, alphablend);
+            else if (clr == 2)
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, alphablend);
+            else if (clr == 3)
+                SDL_SetRenderDrawColor(renderer, 255, 0, 255, alphablend);
+            else if (clr == 4)
+                SDL_SetRenderDrawColor(renderer, 255, 255, 0, alphablend);
+            else if (clr == 5)
+                SDL_SetRenderDrawColor(renderer, 128, 155, 255, alphablend);
+            else if (clr == 6)
+                SDL_SetRenderDrawColor(renderer, 128, 128, 128, alphablend);
+            else if (clr == 7)
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, alphablend);
+            else
+                SDL_SetRenderDrawColor(renderer, 0, 0, 255, alphablend);
+            SDL_RenderFillRect(renderer, &rect);
+        }
+        if (clr == 1)
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
+        else if (clr == 2)
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
+        else if (clr == 3)
+            SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
+        else if (clr == 4)
+            SDL_SetRenderDrawColor(renderer, 255, 255, 0, SDL_ALPHA_OPAQUE);
+        else if (clr == 5)
+            SDL_SetRenderDrawColor(renderer, 128, 155, 255, SDL_ALPHA_OPAQUE);
+        else if (clr == 6)
+            SDL_SetRenderDrawColor(renderer, 128, 128, 128, SDL_ALPHA_OPAQUE);
+        else if (clr == 7)
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+        else
+            SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
         SDL_RenderRect(renderer, &rect);
     }
 
@@ -305,6 +362,7 @@ static int decode_and_display(AVCodecContext *dec_ctx, AVFrame *frame,
     unsigned int drm_format;
     RgaSURF_FORMAT src_format;
     RgaSURF_FORMAT dst_format;
+    int hStride, wStride;
     SDL_Rect rect;
     int ret;
 
@@ -325,14 +383,17 @@ static int decode_and_display(AVCodecContext *dec_ctx, AVFrame *frame,
         desc = (AVDRMFrameDescriptor *)frame->data[0];
         layer = &desc->layers[0];
         if (desc && layer) {
+            wStride = layer->planes[0].pitch;
+            hStride = (layer->planes[1].offset / layer->planes[0].pitch);
+
             drm_format = layer->format;
             src_format = (RgaSURF_FORMAT)drm_get_rgaformat(drm_format);
 
             /* ------------ RKNN ----------- */
-            drm_rga_buf(frame->width, frame->height, desc->objects[0].fd, src_format,
+            drm_rga_buf(frame->width, frame->height, wStride, hStride, desc->objects[0].fd, src_format,
                         screen_width, screen_height, RK_FORMAT_RGB_888,
                         frameSize_texture, (char *)texture_dst_buf);
-            drm_rga_buf(frame->width, frame->height, desc->objects[0].fd, src_format,
+            drm_rga_buf(frame->width, frame->height, frame->width, frame->height, desc->objects[0].fd, src_format,
                         width, height, RK_FORMAT_RGB_888, frameSize_rknn, (char *)resize_buf);
 
             inputs[0].buf = resize_buf;
@@ -384,7 +445,10 @@ void print_help(void)
                     "-f protocol (v4l2, rtsp, rtmp, http)\n"
                     "-p pixel format (h264) - camera\n"
                     "-s video frame size (WxH) - camera\n"
-                    "-r video frame rate - camera\n");
+                    "-r video frame rate - camera\n"
+                    "-o unique object to detect\n"
+                    "-b use alpha blend on detected objects (1 ~ 255)\n"
+                    "-a accuracy perc (1 ~ 100)\n");
 }
 
 /*-------------------------------------------
@@ -525,11 +589,23 @@ int main(int argc, char *argv[])
         case arg_m:
             model_name = argv[i];
             break;
+        case arg_o:
+            obj2det = hash_me(argv[i]);
+            break;
+        case arg_b:
+            alphablend = atoi(argv[i]);
+            break;
+        case arg_a:
+            accur = atoi(argv[i]);
+            break;
         default:
             break;
         }
         i++;
     }
+    // fprintf(stderr,"%s: %u\n", "-p", hash_me("-p"));
+    // fprintf(stderr,"%s: %u\n", "-s", hash_me("-s"));
+
     if (!video_name) {
         fprintf(stderr, "No stream to play! Please pass an input.\n");
         print_help();
@@ -690,11 +766,13 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+#if 0
     if (codecpar->codec_id != AV_CODEC_ID_H264) {
         av_log(0, AV_LOG_ERROR, "H264 support only!\n");
         avformat_close_input(&input_ctx);
         return -1;
     }
+#endif
 
     codec = avcodec_find_decoder(codecpar->codec_id);
     if (!codec) {
@@ -709,7 +787,7 @@ int main(int argc, char *argv[])
         avformat_close_input(&input_ctx);
         return -1;
     }
-    
+
     video = input_ctx->streams[video_stream];
     if (avcodec_parameters_to_context(codec_ctx, video->codecpar) < 0) {
         av_log(0, AV_LOG_ERROR, "Error with the codec!\n");
@@ -777,7 +855,9 @@ int main(int argc, char *argv[])
         SDL_Log("SDL_CreateWindowAndRenderer failed (%s)", SDL_GetError());
         goto error_exit;
     }
-    // SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    if (alphablend) {
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    }
     // SDL_RenderFillRect(renderer, &rect);
     SDL_SetWindowTitle(window, "rknn yolov5 object detection");
     SDL_SetWindowPosition(window, screen_left, screen_top);
@@ -853,8 +933,10 @@ int main(int argc, char *argv[])
 
 error_exit:
 
-    avformat_close_input(&input_ctx);
-    avcodec_free_context(&codec_ctx);
+    if (input_ctx)
+        avformat_close_input(&input_ctx);
+    if (codec_ctx)
+        avcodec_free_context(&codec_ctx);
     if (frame) {
         av_frame_free(&frame);
     }
@@ -873,7 +955,8 @@ error_exit:
     SDL_Quit();
 
     // release
-    ret = rknn_destroy(ctx);
+    if (ctx)
+        ret = rknn_destroy(ctx);
 
     if (model_data) {
         free(model_data);
