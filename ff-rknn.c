@@ -253,6 +253,8 @@ static void displayTexture(void *imageData)
             frmrate = frmrate_update * (1000.0 / (currtime - lasttime));
         }
         lasttime = currtime;
+        avg_frmrate = (prev_frmrate + frmrate) / 2.0;
+        prev_frmrate = frmrate;
     }
 
     SDL_LockTexture(texture, 0, (void **)&texture_data, &texture_pitch);
@@ -349,9 +351,6 @@ static void displayTexture(void *imageData)
     }
 
     SDL_RenderPresent(renderer);
-
-    avg_frmrate = (prev_frmrate + frmrate) / 2.0;
-    prev_frmrate = frmrate;
 }
 
 static int decode_and_display(AVCodecContext *dec_ctx, AVFrame *frame,
@@ -961,6 +960,8 @@ error_exit:
     if (model_data) {
         free(model_data);
     }
+
+    deinitPostProcess();
 
     fprintf(stderr, "Avg FPS: %.1f\n", avg_frmrate);
 }
