@@ -294,8 +294,8 @@ static void displayTexture(void *imageData)
         }
         rect.x = det_result->box.left;
         rect.y = det_result->box.top;
-        rect.w = det_result->box.right - det_result->box.left;
-        rect.h = det_result->box.bottom - det_result->box.top;
+        rect.w = det_result->box.right - det_result->box.left + 1;
+        rect.h = det_result->box.bottom - det_result->box.top + 1;
         if (det_result->name[0] == 'p' && det_result->name[1] == 'e')
             clr = 1;
         else if (det_result->name[0] == 'c' && det_result->name[1] == 'a')
